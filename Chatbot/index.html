@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chatbot – Estudio Contable</title>
+  <style>
+    :root { --violeta:#7a3cff; --bg:#f7f7fb; --card:#fff; }
+    body { margin:0; font-family:system-ui, Arial; background:var(--bg); }
+    .chatbox {
+      position: fixed; bottom: 20px; right: 20px; width: 360px; max-width: 92vw;
+      border-radius: 16px; box-shadow: 0 12px 30px rgba(0,0,0,.12);
+      overflow: hidden; background: var(--card);
+    }
+    .chat-head { background:var(--violeta); color:#fff; padding:14px 16px; font-weight:600; }
+    .chat-body { padding:14px; max-height: 60vh; overflow:auto; }
+    .msg { margin:10px 0; line-height:1.35; }
+    .bot { background:#f1ecff; border-radius:12px; padding:10px 12px; display:inline-block; }
+    .user { text-align:right; }
+    .btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    button.choice {
+      border:0; background:#eee; padding:8px 12px; border-radius:999px; cursor:pointer;
+    }
+    button.choice:hover { background:#e3e3e3; }
+    .input-row { display:flex; gap:8px; margin-top:8px; }
+    .input-row input, .input-row textarea {
+      flex:1; padding:10px 12px; border:1px solid #ddd; border-radius:10px; font-size:14px;
+    }
+    .send { background:var(--violeta); color:#fff; border:0; border-radius:10px; padding:10px 14px; cursor:pointer; }
+    .small { font-size:12px; color:#777; margin-top:4px; }
+    .ok { color:#0a8f3c; font-weight:600; }
+    .error { color:#c62828; font-weight:600; }
+  </style>
+</head>
+<body>
+
+<div class="chatbox" role="dialog" aria-label="Chatbot Estudio Contable">
+  <div class="chat-head">Asistente • Estudio Contable</div>
+  <div class="chat-body" id="chat"></div>
+</div>
+
+<script>
+const lead = {
+  servicio: null, detalle: null, tipoCliente: null, urgencia: null,
+  ubicacion: null, nombre: null, contacto: null, origen: location.hostname
+};
+
+const chat = document.getElementById('chat');
+
+function addBot(text, html=false) {
+  const div = document.createElement('div');
+  div.className = 'msg';
+  div.innerHTML = html ? `<div class="bot">${text}</div>` : `<div class="bot">${escapeHtml(text)}</div>`;
+  chat.appendChild(div); chat.scrollTop = chat.scrollHeight;
+}
+
+function addUser(text) {
+  const div = document.createElement('div');
+  div.className = 'msg user';
+  div.textContent = text;
+  chat.appendChild(div); chat.scrollTop = chat.scrollHeight;
+}
+
+function buttons(options) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'btns';
+  options.forEach(opt => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.textContent = opt.label;
+    b.addEventListener('click', () => opt.onClick(opt.label, opt.value ?? opt.label));
+    wrapper.appendChild(b);
+  });
+  chat.appendChild(wrapper); chat.scrollTop = chat.scrollHeight;
+}
+
+function askInput(placeholder, multiline=false, onSend) {
+  const row = document.createElement('div');
+  row.className = 'input-row';
+  const input = multiline ? document.createElement('textarea') : document.createElement('input');
+  input.placeholder = placeholder; input.rows = 3;
+  const send = document.createElement('button');
+  send.className = 'send'; send.textContent = 'Enviar';
+  send.addEventListener('click', () => {
+    const val = input.value.trim();
+    if (!val) return input.focus();
+    addUser(val); row.remove(); onSend(val);
+  });
+  row.appendChild(input); row.appendChild(send);
+  chat.appendChild(row); input.focus(); chat.scrollTop = chat.scrollHeight;
+}
+
+function escapeHtml(str){ return str.replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s])); }
+
+function start() {
+  addBot("👋 ¡Hola! Soy el asistente del Estudio. Te ayudo con:");
+  addBot("📊 Contables • 💰 Impositivos • 📑 Societarios • 💼 Liquidación de sueldos");
+  addBot("¿Qué servicio necesitás hoy?");
+  buttons([
+    {label:'📊 Contables', value:'Contables', onClick: pickServicio},
+    {label:'💰 Impositivos', value:'Impositivos', onClick: pickServicio},
+    {label:'📑 Societarios', value:'Societarios', onClick: pickServicio},
+    {label:'💼 Sueldos', value:'Liquidación de sueldos', onClick: pickServicio},
+    {label:'Otro', value:'Otro', onClick: pickServicio}
+  ]);
+}
+
+function pickServicio(label, value) {
+  addUser(label);
+  lead.servicio = value;
+  addBot("Contame un poco más del servicio que necesitás:");
+  askInput("Escribí aquí…", false, (txt) => { lead.detalle = txt; askTipoCliente(); });
+}
+
+function askTipoCliente() {
+  addBot("¿Sos una empresa, profesional independiente o particular?");
+  buttons([
+    {label:'🏢 Empresa', value:'Empresa', onClick: (l,v)=>{addUser(l); lead.tipoCliente=v; askUrgencia();}},
+    {label:'👩‍💼 Profesional', value:'Profesional', onClick: (l,v)=>{addUser(l); lead.tipoCliente=v; askUrgencia();}},
+    {label:'🏠 Particular', value:'Particular', onClick: (l,v)=>{addUser(l); lead.tipoCliente=v; askUrgencia();}},
+  ]);
+}
+
+function askUrgencia() {
+  addBot("¿Para cuándo lo necesitás?");
+  buttons([
+    {label:'🚀 Lo antes posible', value:'Inmediato', onClick: (l,v)=>{addUser(l); lead.urgencia=v; askUbicacion();}},
+    {label:'📅 1–2 semanas', value:'1-2 semanas', onClick: (l,v)=>{addUser(l); lead.urgencia=v; askUbicacion();}},
+    {label:'⏳ Más adelante', value:'Más adelante', onClick: (l,v)=>{addUser(l); lead.urgencia=v; askUbicacion();}},
+  ]);
+}
+
+function askUbicacion() {
+  addBot("¿En qué ciudad/provincia estás?");
+  askInput("Ej: Santiago del Estero, AR", false, (txt) => { lead.ubicacion = txt; askDatos(); });
+}
+
+function askDatos() {
+  addBot("Perfecto 👍 Para enviarte una propuesta personalizada, dejame:");
+  addBot("• Tu nombre\n• Un medio de contacto (WhatsApp o email)");
+  askInput("Ej: Ana – +54 9 3xxx o ana@mail.com", false, (txt) => {
+    const parts = txt.split("–");
+    if (parts.length >= 2) {
+      lead.nombre = parts[0].trim();
+      lead.contacto = parts.slice(1).join("–").trim();
+    } else {
+      lead.nombre = txt.trim(); lead.contacto = txt.trim();
+    }
+    submitLead();
+  });
+}
+
+async function submitLead() {
+  addBot("Procesando tus datos… ⏳");
+  try {
+    const res = await fetch("/.netlify/functions/lead-capture", {
+      method: "POST", headers: { "Content-Type":"application/json" },
+      body: JSON.stringify(lead)
+    });
+    const data = await res.json();
+    if (res.ok) {
+      addBot("¡Listo! ✅ Tu consulta fue enviada. Un profesional del Estudio te contactará en breve.", true);
+    } else {
+      addBot("Ocurrió un problema al guardar tu consulta.", true);
+    }
+  } catch (err) {
+    addBot("No pudimos conectar con el servidor.", true);
+  }
+}
+
+start();
+</script>
+</body>
+</html>
+
